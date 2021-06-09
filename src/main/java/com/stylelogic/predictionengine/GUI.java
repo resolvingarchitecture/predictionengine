@@ -9,45 +9,47 @@ import java.awt.event.WindowEvent;
 import javax.swing.*;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.logging.Logger;
 
-public class GUI extends JFrame implements ActionListener, WindowListener
-{
-	Image		icon;
-	Canvas		c;
-	JTextArea 	msgQueue;
-	JPanel 		leftPane,rightPane,contentPane;
-	JButton		button[];
-	JScrollPane scrollPane;
-	EngineControls	engine;
-	Calendar		postedTime, currentTime;
+public class GUI extends JFrame implements ActionListener, WindowListener {
 
-	String[]	ButtonList = {	"Force Processing",
+	private static final Logger LOG = Logger.getLogger(GUI.class.getName());
+
+	private final Image icon;
+	private final JTextArea msgQueue;
+	private final JPanel leftPane;
+	private final JPanel rightPane;
+	private final JPanel contentPane;
+	private final JButton[] button;
+	private final JScrollPane scrollPane;
+	private final EngineControls	engine;
+	private final Calendar postedTime;
+	private final Calendar currentTime;
+
+	private final String[] ButtonList = {	"Force Processing",
 								"Save Log to Disk",
 								"Group Error Stats",
 								"Group Dispersion Stats",
 								"Shut Down Processing"
 								};
-	String[]	ButtonActionList = {"process",
+	private final String[] ButtonActionList = {"process",
 									"save",
 									"error",
 									"group",
 									"halt"
 								};
-	String[]	ButtonTipList = {
-								"Force Processing",
+	private final String[] ButtonTipList = {"Force Processing",
 								"Store the current log to file",
 								"Display error statistics for current group members",
 								"Display distribution statistics for current set of groups",
 								"Shut Down all processors"
 								};
 
-
-	public GUI(EngineControls _engine)
-	{
-		engine = _engine;
+	public GUI(EngineControls engine) {
+		this.engine = engine;
 		icon = 	Toolkit.getDefaultToolkit().getImage("icon.gif");
 		setIconImage(icon);
-		setTitle("Sutters Mill - ReviewMovies");
+		setTitle("Prediction Engine");
 
 		postedTime = Calendar.getInstance();
 		currentTime = Calendar.getInstance();
@@ -64,8 +66,7 @@ public class GUI extends JFrame implements ActionListener, WindowListener
         leftPane.setLayout(box2);
 
         button = new JButton[ButtonList.length];
-        for (int i=0; i<ButtonList.length; i++)
-        {
+        for (int i=0; i<ButtonList.length; i++) {
 	        button[i] = new JButton(ButtonList[i]);
 		    button[i].setActionCommand(ButtonActionList[i]);
 		    button[i].setToolTipText(ButtonTipList[i]);
@@ -86,7 +87,6 @@ public class GUI extends JFrame implements ActionListener, WindowListener
 		scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
         rightPane.add(scrollPane);
 
-
         contentPane.add(leftPane);
         contentPane.add(rightPane);
         setContentPane(contentPane);
@@ -99,13 +99,12 @@ public class GUI extends JFrame implements ActionListener, WindowListener
 
 	public void setActive( boolean _active )
 	{
-		System.out.println("Activating Buttons");
-		for (int i=0; i<button.length; i++)
-			button[i].setEnabled(_active);
+		LOG.info("Activating Buttons");
+		for (JButton jButton : button)
+			jButton.setEnabled(_active);
 	}
 
-	public String FormatTime( Calendar c )
-	{
+	public String FormatTime( Calendar c ) {
 		String s="";
 		if (c.get(Calendar.HOUR_OF_DAY) < 10)  s = "0";
 		s += c.get(Calendar.HOUR_OF_DAY) + ":";
@@ -115,8 +114,7 @@ public class GUI extends JFrame implements ActionListener, WindowListener
 		s += c.get(Calendar.SECOND);
 		return s;
 	}
-	public String FormatDate( Calendar c )
-	{
+	public String FormatDate( Calendar c ) {
 		String s="";
 		if (c.get(Calendar.MONTH) < 10)  s = "0";
 		s += c.get(Calendar.MONTH) + "-";
@@ -126,75 +124,50 @@ public class GUI extends JFrame implements ActionListener, WindowListener
 		return s;
 	}
 
-
-	public void addMessage( String msg )
-	{
-		String s;
-
+	public void addMessage( String msg ) {
 		currentTime.setTime(new Date(System.currentTimeMillis()));
-		if (postedTime.get(Calendar.DAY_OF_MONTH) != currentTime.get(Calendar.DAY_OF_MONTH))
-		{
+		if (postedTime.get(Calendar.DAY_OF_MONTH) != currentTime.get(Calendar.DAY_OF_MONTH)) {
 			msgQueue.insert(">>>"+FormatDate(currentTime)+"<<<\n",0);
 			postedTime.setTime( currentTime.getTime() );
 		}
 		msgQueue.insert(FormatTime(currentTime) + "  -  "+msg+"\n",0);
 	}
 
-	public void update(Graphics g)
-	{
+	public void update(Graphics g) {
 		Dimension  d = getSize();
 		g.clearRect(0,0,d.width,d.height);
 	    paint(g);
 	}
 
-	public void paint(Graphics g)
-	{
+	public void paint(Graphics g) {
 		g.drawImage(icon,10,25,this);
 		leftPane.repaint();
 		rightPane.repaint();
 	}
 
-	public void saveLogFile()
-	{
-		try
-		{
+	public void saveLogFile() {
+		try {
 			FileWriter fout = new FileWriter("Log"+FormatDate(currentTime).replace('-','_')+"__"+FormatTime(currentTime).replace(':','_')+".log");
 			fout.write(msgQueue.getText());
 			fout.close();
+		} catch(IOException ex){
+			LOG.warning("StoreGroupRatings IOException: " + ex.getMessage());
 		}
-		catch(IOException ex){ System.err.println("StoreGroupRatings IOException: " + ex.getMessage());}
 		msgQueue.setText(">>>"+FormatDate(currentTime)+"<<<\n");
 		msgQueue.insert(FormatTime(currentTime) + "  -  Log File Saved to Disk\n",0);
 	}
 
-	public void actionPerformed(ActionEvent e)
-	{
-	    String action = e.getActionCommand();
-	    if (action.equals("process"))
-	    {
-			engine.startGroupingEngine();
-		}
-		else if (action.equals("save"))
-		{
-			saveLogFile();
-		}
-		else if (action.equals("error"))
-		{
-			engine.showGroupErrorStats();
-		}
-		else if (action.equals("group"))
-		{
-			engine.showGroupDistanceStats();
-		}
-		else if (action.equals("halt"))
-		{
-			engine.haltProcessing();
+	public void actionPerformed(ActionEvent e) {
+	    switch (e.getActionCommand()) {
+			case "process": engine.startGroupingEngine();break;
+			case "save": saveLogFile();break;
+			case "error": engine.showGroupErrorStats();break;
+			case "group": engine.showGroupDistanceStats();break;
+			case "halt": engine.haltProcessing();
 		}
     }
 
-
-	public void windowClosing(WindowEvent e)
-	{
+	public void windowClosing(WindowEvent e) {
 		if (!engine.haltProcessing())
 			System.exit(0);
 		setVisible(false);

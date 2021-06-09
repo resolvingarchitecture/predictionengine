@@ -2,8 +2,8 @@ package com.stylelogic.predictionengine;
 
 public class GroupInfo{
 	double			groupHappiness,user_growthFactor,item_growthFactor;
-	double			Member_Item_Rating_SD,Item_Rating_SD,Item_Rating_Mean,Predictive_Error;
-	int				Item_Rating_N;
+	double memberItemRatingSD, itemRatingSD, itemRatingMean, predictiveError;
+	int itemRatingN;
 	int				memberCount,groupIndex,value_fargID,hist_fargID,dx,ratingCount=0;
 	GroupRatings[]	ratings;
 	byte[]			userList;
@@ -32,11 +32,11 @@ public class GroupInfo{
 
 		ratingCount = itemCount;
 		groupHappiness = 0;
-		Member_Item_Rating_SD = 0;
-		Item_Rating_SD = 0;
-		Item_Rating_Mean =0;
-		Predictive_Error = 0;
-		Item_Rating_N = 0;
+		memberItemRatingSD = 0;
+		itemRatingSD = 0;
+		itemRatingMean =0;
+		predictiveError = 0;
+		itemRatingN = 0;
 	}
 
 	public void refresh()
@@ -206,18 +206,3 @@ if (!valid) 	System.out.print((float) ratings[i].rating/ ((long) 1 << 32)+" V "+
 }
 
 
-class GroupRatings
-{
-	long	rating;
-	boolean valid = true;
-	boolean modified = false;
-	short	weight;
-	short[]	ratings = {0,0,0,0,0,0,0};
-
-	public GroupRatings()
-	{	rating=0; weight=0;}
-	public GroupRatings(int _rating, short _weight)
-	{	rating=_rating; weight=_weight;}
-	public GroupRatings(int _rating, short _weight, short _ratings[])
-	{	rating=_rating; weight=_weight; ratings=_ratings; }
-}

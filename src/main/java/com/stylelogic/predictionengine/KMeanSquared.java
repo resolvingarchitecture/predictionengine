@@ -1,45 +1,48 @@
 package com.stylelogic.predictionengine;
 
 import java.lang.*;
+import java.util.logging.Logger;
 
-public class KMeanSquared implements GroupingAlgorithm
-{
-	MiningData	mine;
-	float		dh;
+public class KMeanSquared implements GroupingAlgorithm {
 
-	public KMeanSquared(MiningData _mine)
-	{
-		this.mine = _mine;
+	private static Logger LOG = Logger.getLogger(KMeanSquared.class.getName());
+
+	private MiningData mine;
+	private float dh;
+
+	public KMeanSquared(MiningData mine) {
+		this.mine = mine;
 	}
 
-	public void init(int kValue)
-	{
-		float	maxd = 0, d=0;
-		int		userList[],round,newUser,initUser,i,j;
+	public void init(int kValue) {
+		float maxd;
+		float d;
+		int[] userList;
+		int round;
+		int newUser;
+		int initUser;
+		int i;
+		int j;
 		boolean	pass;
 		userList = new int[kValue];
 
-		for (round=0;round<kValue; round++)
-		{
+		for (round=0;round<kValue; round++) {
 			System.out.println("Starting Round "+round);
-			maxd=0;d=0;initUser=-1;newUser=-1;
+			maxd=0;
+			initUser=-1;
+			newUser=-1;
 			for (i=0;i<mine.userCount;i++)
-			if (mine.users[i].ratings.length >= 30)
-			{
-				if (i%100==0) System.out.print("|");
+			if (mine.users[i].ratings.length >= 30) {
+				if (i%100==0) LOG.info("|");
 				pass=true;
 				for (j=0; j<round; j++)
 					if (i == userList[j]) pass=false;
 				if (pass)
-					if (round==0)
-					{
-						for (j=i+1;j<mine.userCount && maxd<5.0;j++)
-						{
+					if (round==0) {
+						for (j=i+1;j<mine.userCount && maxd<5.0;j++) {
 							if (j%100==0) System.out.print(".");
-							if (mine.users[j].ratings.length >= 30)
-							{
-								if ((d = evalUserUser(i,j)) > maxd)
-								{
+							if (mine.users[j].ratings.length >= 30) {
+								if ((d = evalUserUser(i,j)) > maxd) {
 									newUser=i;
 									initUser=j;
 									System.out.println("Users "+i+","+j+" :: d="+d);
@@ -47,25 +50,19 @@ public class KMeanSquared implements GroupingAlgorithm
 								}
 							}
 						}
-					}
-					else
-					{
-						if ((d = evalUserList(i,userList,round)) > maxd)
-						{
-							newUser=i;
-							maxd=d;
-							System.out.println("User "+i+":List["+round+"] :: d="+d);
-						}
+					} else if ((d = evalUserList(i,userList,round)) > maxd) {
+						newUser=i;
+						maxd=d;
+						System.out.println("User "+i+":List["+round+"] :: d="+d);
 					}
 			}
-			System.out.println("Completed...Max d="+maxd);
+			LOG.info("Completed...Max d="+maxd);
 			if (round==0 && initUser>=0) userList[round++] = initUser;
 			if (newUser>=0) userList[round] = newUser;
-			if (newUser>=0) System.out.println("Added User"+newUser);
+			if (newUser>=0) LOG.info("Added User"+newUser);
 		}
 
-		for (i=0;i<userList.length;i++)
-		{
+		for (i=0;i<userList.length;i++) {
 			mine.groups[i].addUser( mine.users[userList[i]].userIndex, mine.users[userList[i]].ratings, 0);
 			mine.users[userList[i]].setGroup(i, 0);
 		}
@@ -73,17 +70,19 @@ public class KMeanSquared implements GroupingAlgorithm
 
 	private float evalUserUser( int user1, int user2 )
 	{
-		int		d=0,index,left,right,itemIndex;
-		int		weight=0;
+		int	d=0;
+		int index;
+		int left;
+		int right;
+		int itemIndex;
+		int	weight=0;
 
-		for (int i=0; i<mine.users[user1].ratings.length; i++)
-		{
+		for (int i=0; i<mine.users[user1].ratings.length; i++) {
 			itemIndex = mine.users[user1].ratings[i].itemIndex;
 //			System.out.println("-------------Looking for Item "+itemIndex);
 			left=0;right=mine.users[user2].ratings.length-1;
 			index = right;
-			while (itemIndex != mine.users[user2].ratings[index].itemIndex && left+1<right)
-			{
+			while (itemIndex != mine.users[user2].ratings[index].itemIndex && left+1<right) {
 //				System.out.println("Left:"+left+" Right:"+right+" Index:"+index);
 				index = left+(right-left)/2;
 				if (itemIndex > mine.users[user2].ratings[index].itemIndex)
@@ -91,8 +90,7 @@ public class KMeanSquared implements GroupingAlgorithm
 				else
 					right=index;
 			}
-			if (itemIndex == mine.users[user2].ratings[index].itemIndex)
-			{
+			if (itemIndex == mine.users[user2].ratings[index].itemIndex) {
 				d += abs( mine.users[user1].ratings[i].rating - mine.users[user2].ratings[index].rating);
 				weight++;
 			}
@@ -100,10 +98,8 @@ public class KMeanSquared implements GroupingAlgorithm
 		return ( (weight>0)?(float)d/weight:0);
 	}
 
-	private float evalUserList( int user, int userList[], int round )
-	{
+	private float evalUserList( int user, int userList[], int round ) {
 		float d=0;
-
 		for (int j=0; j<round; j++)
 			d+=evalUserUser(user,userList[j]);
 		return ( d );
@@ -111,29 +107,25 @@ public class KMeanSquared implements GroupingAlgorithm
 
 
 
-	public void start()
-	{
-		int		brk=100;
-		float	dhdt=0;
+	public void start() {
+		int	brk=100;
+		float dhdt=0;
 		do {
 			dhdt = 0;
-			System.out.println("Scanning Users Timeout-"+brk);
-			for (int i=0; i<mine.userCount; i++)
-			{
+			LOG.info("Scanning Users Timeout-"+brk);
+			for (int i=0; i<mine.userCount; i++) {
 //				System.out.println("Inspecting User-"+i);
 				dhdt+=inspectUser(i);
 			}
-			System.out.println("Final DH/DT-"+dhdt+"------------------------------"+brk);
+			LOG.info("Final DH/DT-"+dhdt+"------------------------------"+brk);
 		} while (dhdt!=0 && brk-->0);
 	}
 
-	public boolean isolateUser(int userIndex)
-	{
+	public boolean isolateUser(int userIndex) {
 		boolean state=false;
 		UserInfo user = mine.users[userIndex];
 		if (user != null)
-			try
-			{
+			try {
 				if (user.groupIndex >=0 )
 					if (state = mine.groups[user.groupIndex].removeUser(user.userIndex,user.ratings,user.happiness))
 						user.setGroup(-1, 0);
@@ -407,21 +399,21 @@ private long abs(long a)
 				count++;
 			}
 		if (count>1)
-			 mine.groups[g].Member_Item_Rating_SD =  memberSD/(double)(count);
-		else mine.groups[g].Member_Item_Rating_SD = -1;
+			 mine.groups[g].memberItemRatingSD =  memberSD/(double)(count);
+		else mine.groups[g].memberItemRatingSD = -1;
 
 
-		mine.groups[g].Predictive_Error = pe;
-		mine.groups[g].Item_Rating_N = n;
-		mine.groups[g].Item_Rating_Mean = mean;
+		mine.groups[g].predictiveError = pe;
+		mine.groups[g].itemRatingN = n;
+		mine.groups[g].itemRatingMean = mean;
 		if (n>1)
-			 mine.groups[g].Item_Rating_SD = sd;
-		else mine.groups[g].Item_Rating_SD = -1;
+			 mine.groups[g].itemRatingSD = sd;
+		else mine.groups[g].itemRatingSD = -1;
 
-		if (mine.groups[g].Member_Item_Rating_SD > 0)
-			mine.groups[g].groupHappiness = mine.groups[g].Predictive_Error / mine.groups[g].Member_Item_Rating_SD;
+		if (mine.groups[g].memberItemRatingSD > 0)
+			mine.groups[g].groupHappiness = mine.groups[g].predictiveError / mine.groups[g].memberItemRatingSD;
 		else
-			mine.groups[g].groupHappiness = mine.groups[g].Predictive_Error * 25;
+			mine.groups[g].groupHappiness = mine.groups[g].predictiveError * 25;
 
 
 	}
