@@ -21,15 +21,24 @@
 
 	<developers>
 		<developer>
-			<name>objectorange</name>
-			<email>objectorange@1m5.io</email>
+			<name>John Skrinska</name>
+		</developer>
+		<developer>
+			<name>James Skrinska</name>
+			<url>https://www.linkedin.com/in/jamesskrinska</url>
+		</developer>
+		<developer>
+			<name>Brian Taylor</name>
+			<email>brian@resolvingarchitecture.io</email>
+			<organization>Resolving Architecture</organization>
+			<url>https://resolvingarchitecture.io</url>
 		</developer>
 	</developers>
 
 	<scm>
-		<connection>scm:git@github.com/1m5/predictionengine-java</connection>
-		<developerConnection>scm:git@github.com/1m5/predictionengine-java</developerConnection>
-		<url>git@github.com/1m5/1m5-java</url>
+		<connection>scm:git@github.com/resolvingarchitecture/stylelogic-suttermillv2</connection>
+		<developerConnection>scm:git@github.com/resolvingarchitecture/stylelogic-suttermillv2</developerConnection>
+		<url>git@github.com/resolvingarchitecture/stylelogic-suttermillv2</url>
 	</scm>
 
 	<repositories>
