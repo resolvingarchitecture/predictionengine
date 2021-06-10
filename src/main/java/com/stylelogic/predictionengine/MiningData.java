@@ -4,10 +4,15 @@ import java.util.List;
 
 public class MiningData {
 
-	int	userCount=0, groupCount=0, itemCount=0;
-	IdIndex	itemIndex, userIndex, groupIndex;
+	int	userCount=0;
+	int groupCount=0;
+	int itemCount=0;
+	IdIndex	itemIndex;
+	IdIndex userIndex;
+	IdIndex groupIndex;
 	UserInfo[] users;
 	GroupInfo[] groups;
+	private int	kValue = 80;
 
 	final static double USER_INDEX_PADDING = 0.25;
 	final static double GROUP_INDEX_PADDING = 1.00;
@@ -37,8 +42,6 @@ public class MiningData {
 		users = newUsers;
 	}
 
-
-
 	public void prepareItemIndex(List<Integer> itemIds) {
 		itemIndex = new IdIndex(itemIds, ITEM_INDEX_PADDING);
 		itemCount = itemIndex.size();
@@ -55,6 +58,8 @@ public class MiningData {
 		groups = new GroupInfo[groupIndex.size()];
 		for (int index=0;index<groupCount;index++)
 			groups[index] = new GroupInfo(index,itemCount,userCount, ITEM_INDEX_PADDING, USER_INDEX_PADDING);
+		if (userGroupIds.size()>kValue)
+			kValue=userGroupIds.size();
 	}
 
 	public int addGroup(int id) {

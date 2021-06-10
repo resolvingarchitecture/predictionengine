@@ -1,10 +1,13 @@
 package com.stylelogic.predictionengine;
 
 import org.jdbi.v3.core.Jdbi;
+import ra.common.Tuple3;
 
 import java.io.IOException;
 
 import java.util.*;
+
+import static com.stylelogic.predictionengine.DAO.LOG;
 
 public class GroupingEngine implements EngineControls //extends Frame
 {
@@ -46,19 +49,9 @@ public class GroupingEngine implements EngineControls //extends Frame
 		gui = new GUI(this);
 		gui.addMessage("Initializing Prediction Engine...");
 
-		jdbi = Jdbi.create("jdbc:h2:mem:peDB"); // (H2 in-memory database)
-		jdbi.withHandle(handle -> handle.createUpdate("CREATE TABLE item (item_id IDENTITY PRIMARY KEY)").execute());
-		jdbi.withHandle(handle -> handle.createUpdate("CREATE TABLE user (user_id IDENTITY PRIMARY KEY)").execute());
-		jdbi.withHandle(handle -> handle.createUpdate("CREATE TABLE group (group_id IDENTITY PRIMARY KEY)").execute());
-		jdbi.withHandle(handle -> handle.createUpdate("CREATE TABLE user_rating").execute());
-		jdbi.withHandle(handle -> handle.createUpdate("CREATE TABLE user_group_membership (user_id NUMERIC, group_id NUMERIC, happiness_percent NUMERIC)").execute());
-		jdbi.withHandle(handle -> handle.createUpdate("CREATE TABLE prediction_group (group_id NUMERIC, member_count NUMERIC, member_item_rating_sd NUMERIC, item_rating_n NUMERIC, item_rating_sd NUMERIC, item_rating_mean NUMERIC, predictive_error NUMERIC, group_happiness NUMERIC )").execute());
-		jdbi.withHandle(handle -> handle.createUpdate("CREATE TABLE group_ratings (group_id NUMERIC, item_id NUMERIC, rating NUMERIC, weight NUMERIC)").execute());
-
-
 		mine = new MiningData();
-
-		dao = new DAO(mine, jdbi);
+		dao = new DAO(mine);
+		jdbi = dao.getJdbi();
 
 		gui.addMessage("Initializing Indicies");
 		dao.loadIndicies();
@@ -69,13 +62,25 @@ public class GroupingEngine implements EngineControls //extends Frame
 		}
 
 		gui.addMessage("Loading User Ratings");
-		dao.loadUserRatings(0,mine.getUserCount());
+		dao.loadUserRatings();
+//		dao.loadUserRatings(0,mine.getUserCount());
 		endTime0 = System.currentTimeMillis();;
 		kMean = new KMeanSquared(mine);
 
 		System.out.println("Initializing GroupingAlgorithm");
 		gui.addMessage("Loading Group Ratings & Reviews");
-		dao.loadGroupByUserMembership();
+		int count = 0;
+		List<Tuple3> userGroupMemberships = dao.getUserGroupMemberships();
+		for(Tuple3 t : userGroupMemberships) {
+			if (count++ % 100==0) LOG.info(".");
+			int uIndex = mine.getUserIndex((Integer)t.first);
+			int gIndex = mine.getGroupIndex((Integer)t.second);
+			float happiness = (Integer)t.third / 100;
+			if (mine.users[uIndex] != null) {
+				mine.groups[gIndex].addUser(uIndex,mine.users[uIndex].ratings, happiness);
+				mine.users[uIndex].setGroup(gIndex, happiness);
+			}
+		}
 
 		processingDaemon = new ProcessingDaemon(this, gui);
 		processingDaemon.start();

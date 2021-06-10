@@ -17,44 +17,47 @@ public class KMeanSquared implements GroupingAlgorithm {
 	public void init(int kValue) {
 		float maxd;
 		float d;
-		int[] userList;
 		int round;
 		int newUser;
 		int initUser;
 		int i;
 		int j;
 		boolean	pass;
-		userList = new int[kValue];
+		int[] userList = new int[kValue];
 
-		for (round=0;round<kValue; round++) {
-			System.out.println("Starting Round "+round);
+		for (round=0; round<kValue; round++) {
+			LOG.info("Starting Round "+round);
 			maxd=0;
 			initUser=-1;
 			newUser=-1;
-			for (i=0;i<mine.userCount;i++)
-			if (mine.users[i].ratings.length >= 30) {
-				if (i%100==0) LOG.info("|");
-				pass=true;
-				for (j=0; j<round; j++)
-					if (i == userList[j]) pass=false;
-				if (pass)
-					if (round==0) {
-						for (j=i+1;j<mine.userCount && maxd<5.0;j++) {
-							if (j%100==0) System.out.print(".");
-							if (mine.users[j].ratings.length >= 30) {
-								if ((d = evalUserUser(i,j)) > maxd) {
-									newUser=i;
-									initUser=j;
-									System.out.println("Users "+i+","+j+" :: d="+d);
-									maxd=d;
+			for (i=0;i<mine.userCount;i++) {
+				if (mine.users[i].ratings.length >= 30) {
+					if (i % 100 == 0)
+						LOG.info("|");
+					pass = true;
+					for (j = 0; j < round; j++) {
+						if (i == userList[j]) pass = false;
+					}
+					if (pass) {
+						if (round == 0) {
+							for (j = i + 1; j < mine.userCount && maxd < 5.0; j++) {
+								if (j % 100 == 0) System.out.print(".");
+								if (mine.users[j].ratings.length >= 30) {
+									if ((d = evalUserUser(i, j)) > maxd) {
+										newUser = i;
+										initUser = j;
+										System.out.println("Users " + i + "," + j + " :: d=" + d);
+										maxd = d;
+									}
 								}
 							}
+						} else if ((d = evalUserList(i, userList, round)) > maxd) {
+							newUser = i;
+							maxd = d;
+							System.out.println("User " + i + ":List[" + round + "] :: d=" + d);
 						}
-					} else if ((d = evalUserList(i,userList,round)) > maxd) {
-						newUser=i;
-						maxd=d;
-						System.out.println("User "+i+":List["+round+"] :: d="+d);
 					}
+				}
 			}
 			LOG.info("Completed...Max d="+maxd);
 			if (round==0 && initUser>=0) userList[round++] = initUser;
@@ -68,8 +71,7 @@ public class KMeanSquared implements GroupingAlgorithm {
 		}
 	}
 
-	private float evalUserUser( int user1, int user2 )
-	{
+	private float evalUserUser( int user1, int user2 ) {
 		int	d=0;
 		int index;
 		int left;
@@ -80,7 +82,8 @@ public class KMeanSquared implements GroupingAlgorithm {
 		for (int i=0; i<mine.users[user1].ratings.length; i++) {
 			itemIndex = mine.users[user1].ratings[i].itemIndex;
 //			System.out.println("-------------Looking for Item "+itemIndex);
-			left=0;right=mine.users[user2].ratings.length-1;
+			left = 0;
+			right = mine.users[user2].ratings.length-1;
 			index = right;
 			while (itemIndex != mine.users[user2].ratings[index].itemIndex && left+1<right) {
 //				System.out.println("Left:"+left+" Right:"+right+" Index:"+index);

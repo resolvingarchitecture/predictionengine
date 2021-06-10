@@ -1,6 +1,7 @@
 package com.stylelogic.predictionengine;
 
 import org.jdbi.v3.core.Jdbi;
+import ra.common.Tuple3;
 
 import java.io.IOException;
 import java.io.*;
@@ -9,289 +10,308 @@ import java.sql.*;
 import java.util.List;
 import java.util.logging.Logger;
 
-public class DAO
-{
+public class DAO {
+
 	public static final Logger LOG = Logger.getLogger(DAO.class.getName());
 
 	MiningData mine;
-	Jdbi jdbi;
-	private int	kValue = 80;
-	final static int MIN_RATINGES_PER_PREDICTON = 1;
+	private final Jdbi jdbi;
+	final static int MIN_RATINGS_PER_PREDICTON = 1;
 
-	public DAO(MiningData mine, Jdbi jdbi) {
+	public DAO(MiningData mine) {
 		this.mine = mine;
-		this.jdbi = jdbi;
+		this.jdbi = Jdbi.create("jdbc:h2:mem:peDB"); // (H2 in-memory database)
+		jdbi.withHandle(handle -> handle.createUpdate("CREATE TABLE item (item_id IDENTITY PRIMARY KEY)").execute());
+		jdbi.withHandle(handle -> handle.createUpdate("CREATE TABLE user (user_id IDENTITY PRIMARY KEY)").execute());
+		jdbi.withHandle(handle -> handle.createUpdate("CREATE TABLE group (group_id IDENTITY PRIMARY KEY)").execute());
+		jdbi.withHandle(handle -> handle.createUpdate("CREATE TABLE user_rating (user_id NUMERIC, item_id NUMERIC, rating NUMERIC)").execute());
+		jdbi.withHandle(handle -> handle.createUpdate("CREATE TABLE user_group_membership (user_id NUMERIC, group_id NUMERIC, happiness_percent NUMERIC)").execute());
+		jdbi.withHandle(handle -> handle.createUpdate("CREATE TABLE prediction_group (group_id NUMERIC, member_count NUMERIC, member_item_rating_sd NUMERIC, item_rating_n NUMERIC, item_rating_sd NUMERIC, item_rating_mean NUMERIC, predictive_error NUMERIC, group_happiness NUMERIC )").execute());
+		jdbi.withHandle(handle -> handle.createUpdate("CREATE TABLE group_rating (group_id NUMERIC, item_id NUMERIC, rating NUMERIC, weight NUMERIC)").execute());
+		jdbi.withHandle(handle -> handle.createUpdate("CREATE TABLE group_farg (farg_id NUMERIC, group_id NUMERIC)").execute());
+	}
+
+	public Jdbi getJdbi() {
+		return jdbi;
+	}
+
+	public List<Integer> getItemIds() {
+		return jdbi.withHandle(handle -> handle.createQuery("SELECT id FROM item ORDER BY id").mapTo(Integer.class).list());
+	}
+
+	public List<Integer> getUserIds() {
+		return jdbi.withHandle(handle -> handle.createQuery("SELECT id FROM 'user' ORDER BY id").mapTo(Integer.class).list());
+	}
+
+	public List<Integer> getGroupIds() {
+		return jdbi.withHandle(handle -> handle.createQuery("SELECT id FROM 'group' ORDER BY id").mapTo(Integer.class).list());
+	}
+
+	public List<Tuple3> getUserRatings() {
+		return jdbi.withHandle(handle -> handle.createQuery("SELECT * FROM user_rating GROUP BY user_id").mapTo(Tuple3.class).list());
+	}
+
+	public List<Tuple3> getUserRatingsByUser(int userId) {
+		return jdbi.withHandle(handle -> handle.createQuery("SELECT item_id, rating FROM user_rating WHERE user_id = :userId").bind("userId", userId).mapTo(Tuple3.class).list());
+	}
+
+	public List<Tuple3> getUserGroupMemberships() {
+		return jdbi.withHandle(handle -> handle.createQuery("SELECT * FROM user_group_membership ORDER BY user_id").mapTo(Tuple3.class).list());
 	}
 
 	public void loadIndicies()
 	{
-		int[] itemIDs;
+//		int[] itemIDs;
 		int	i;
 		int g;
-		int	count;
+//		int	count;
 
-		try
-		{
-			LOG.info("Quering Item Indicies...");
-
-			count = jdbi.withHandle(handle -> handle.createQuery("SELECT COUNT(*) FROM item").mapTo(Integer.class).one());
+//		try
+//		{
+//			LOG.info("Quering Item Indicies...");
+//			count = jdbi.withHandle(handle -> handle.createQuery("SELECT COUNT(*) FROM item").mapTo(Integer.class).one());
 //			ResultSet rs = jdbi.Query(con,"exec usp_DM_Index_item_count");
 //			rs.next();
 //			count = rs.getInt(1);
 //			rs.close();
-			itemIDs = new int[count];
-
-			List<Integer> itemList = jdbi.withHandle(handle -> handle.createQuery("SELECT id FROM item").mapTo(Integer.class).list());
+//			itemIDs = new int[count];
 //			rs = jdbi.Query(con,"exec usp_DM_Index_item_select");
-			i=0;
+//			i=0;
 			LOG.info("Initializing Item Indicies...");
 //			while (rs.next()) {
 //				itemIDs[i++] = rs.getInt(1);
 //			}
-			for(Integer itemId : itemList) {
-				itemIDs[i++] = itemId;
-			}
 //			rs.close();
-			mine.prepareItemIndex(itemIDs);
-			LOG.info("Completed");
+			mine.prepareItemIndex(getItemIds());
+//			LOG.info("Completed");
 
-			LOG.info("Quering User Indicies...");
-			count = jdbi.withHandle(handle -> handle.createQuery("SELECT COUNT(*) FROM user").mapTo(Integer.class).one());
+//			LOG.info("Quering User Indicies...");
+//			count = jdbi.withHandle(handle -> handle.createQuery("SELECT COUNT(*) FROM user").mapTo(Integer.class).one());
 //			rs = jdbi.Query(con,"exec usp_DM_Index_user_count");
 //			rs.next();
 //			count = rs.getInt(1);
 //			rs.close();
-			itemIDs = new int[count];
-
-			List<Integer> userList = jdbi.withHandle(handle -> handle.createQuery("SELECT id FROM user").mapTo(Integer.class).list());
+//			itemIDs = new int[count];
 //			rs = jdbi.Query(con,"exec usp_DM_Index_user_select");
-			i=0;
+//			i=0;
 			LOG.info("Initializing User Indicies...");
 //			while (rs.next())
 //				itemIDs[i++] = rs.getInt(1);
 
-			mine.prepareUserIndex(userList.toArray());
-			LOG.info("Completed");
+			mine.prepareUserIndex(getUserIds());
+//			LOG.info("Completed");
 
-			LOG.info("Quering Group Indicies...");
-			rs = jdbi.Query(con,"exec usp_DM_Index_group_count");
-			rs.next();
-			count = rs.getInt(1);
-			rs.close();
-			if (count>kValue) kValue=count;
-			mine.groupCount = kValue;
-
-			rs = jdbi.Query(con,"exec usp_DM_Index_group_select");
-			itemIDs = new int[count];
-			i=0;
-			while (rs.next())
-				itemIDs[i++] = rs.getInt(1);
+//			LOG.info("Quering Group Indicies...");
+//			rs = jdbi.Query(con,"exec usp_DM_Index_group_count");
+//			rs.next();
+//			count = rs.getInt(1);
+//			rs.close();
+//			if (count>kValue) kValue=count;
+//			mine.groupCount = kValue;
+//			rs = jdbi.Query(con,"exec usp_DM_Index_group_select");
+//			itemIDs = new int[count];
+//			i=0;
+//			while (rs.next())
+//				itemIDs[i++] = rs.getInt(1);
 			LOG.info("Initializing Group Indicies...");
-			mine.prepareGroupIndex(itemIDs);
+			mine.prepareGroupIndex(getGroupIds());
+//			if (count>kValue) kValue=count;
+//			mine.groupCount = kValue;
 
 			LOG.info("Initializing Group ResultIDs overall...");
-			rs = jdbi.Query(con,"exec usp_DM_Index_group_FARGID_1_select");
-			while (rs.next())
-			{
+			rs = jdbi.Query("exec usp_DM_Index_group_FARGID_1_select");
+			while (rs.next()) {
 				i = rs.getInt(1);
 				g = rs.getInt(2);
 //				groups[groupIndex.getIndex(g)].value_fargID = i;
-				mine.groups[g].value_fargID = i;
+				mine.groups[g].valueFargID = i;
 			}
 			LOG.info("Initializing Group ResultIDs histogram...");
 			rs = jdbi.Query(con,"exec usp_DM_Index_group_FARGID_33_select");
-			while (rs.next())
-			{
+			while (rs.next()) {
 				i = rs.getInt(1);
 				g = rs.getInt(2);
-				mine.groups[g].hist_fargID = i;
+				mine.groups[g].histFargID = i;
 			}
-			rs.close();
-			LOG.info("Completed");
-
-		}
-		catch(SQLException ex){ System.err.println("LoadIndicies SQLException: " + ex.getMessage());}
+//			rs.close();
+			LOG.info("Loaded indicies.");
+//		}
+//		catch(SQLException ex){ System.err.println("LoadIndicies SQLException: " + ex.getMessage());}
 	}
 
-	public boolean loadGroupRatings() {
-		int iIndex;
-		int gIndex;
+//	public boolean loadGroupRatings() {
+//		int iIndex;
+//		int gIndex;
+//
+//		int i = 0;
+//		int rr;
+//		int id;
+//		short w;
+//		float r;
+//
+//		try {
+//	        LOG.info("Quering Group Reviews-------------------");
+//			ResultSet rs = jdbi.Query("exec usp_DM_group_Reviews_select");
+//	        LOG.info("Loading Group Reviews-------------------");
+//			while  ( rs.next() ) {
+//				i++;
+//				gIndex = mine.getGroupIndex( rs.getInt("groupID") );
+//				iIndex = mine.getItemIndex( rs.getInt("itemID") );
+//				r = rs.getFloat("rating");
+//				w = rs.getShort("weight");
+//
+//				mine.groups[gIndex].ratings[iIndex].rating = (long)(r*((long)1<<32));
+//				mine.groups[gIndex].ratings[iIndex].weight = w;
+//
+//				if (i%100 == 0) LOG.info(".");
+//			}
+//	        LOG.info("Completed-------------------");
+//
+//			LOG.info("Quering Group Ratings-------------------");
+//			rs = jdbi.Query("exec usp_DM_group_Ratings_select");
+//			LOG.info("Loading Group Ratings-------------------");
+//
+//			int k = 0;
+//			i=-1;
+//			gIndex=0;
+//			iIndex=0;
+//			short[] ratings = new short[7];
+//			while  ( rs.next() ) {
+//				k++;
+//				if (k % 100 == 0)
+//					LOG.info(".");
+//				gIndex = mine.getGroupIndex( rs.getInt("groupID") );
+//				id = rs.getInt("itemID");
+//				iIndex = mine.getItemIndex(id);
+//				rr = rs.getInt("rating");
+//				w = rs.getShort("weight");
+//				if (id != i) {
+//					if (i>=0) mine.groups[gIndex].ratings[iIndex].ratings = ratings;
+//					i = id;
+//					ratings = new short[7];
+//					for (int count=0;count<7;count++)
+//						ratings[count]=0;
+//				}
+//				ratings[rr] = w;
+//			}
+//			if (i>=0)
+//				mine.groups[gIndex].ratings[iIndex].ratings = ratings;
+//			LOG.info("Completed-------------------");
+//
+//	        readGroupUserMembership();
+//
+//			for (i=0; i<mine.getGroupCount() ; i++) {
+//				mine.groups[i].dx = GroupInfo.DIRTY_DX+1;
+//				mine.groups[i].refresh();
+//			}
+//
+//			LOG.info("Completed-------------------");
+//			i=1;
+//		}
+//		catch(SQLException ex){
+//			System.err.println("LoadGroupRatings SQLException: " + ex.getMessage());
+//		}
+//
+//		return (i>0);
+//	}
 
-		int i = 0;
-		int rr;
-		int id;
-		short w;
-		float r;
 
-		try {
-	        LOG.info("Quering Group Reviews-------------------");
-			ResultSet rs = jdbi.Query("exec usp_DM_group_Reviews_select");
-	        LOG.info("Loading Group Reviews-------------------");
-			while  ( rs.next() ) {
-				i++;
-				gIndex = mine.getGroupIndex( rs.getInt("groupID") );
-				iIndex = mine.getItemIndex( rs.getInt("itemID") );
-				r = rs.getFloat("rating");
-				w = rs.getShort("weight");
+//	public void readGroupUserMembership() {
+//		LOG.info("Quering Group User Xref-------------------");
+//		ResultSet rs = jdbi.Query("exec usp_DM_user_GroupMembership_select");
+//		LOG.info("Loading Group User Xref-------------------");
+//		while  ( rs.next() ) {
+//			int uIndex = mine.getUserIndex( rs.getInt(1) );
+//			int gIndex = mine.getGroupIndex( rs.getInt(2) );
+//
+//			mine.groups[gIndex].userList[uIndex/8] ^= 1<<uIndex%8;
+//			mine.groups[gIndex].memberCount++;
+//			if (mine.users[uIndex] != null)
+//			{
+//				mine.users[uIndex].groupIndex = gIndex;
+//				mine.users[uIndex].happiness = rs.getInt(3)/100;
+//			}
+//		}
+//		rs.close();
+//	}
 
-				mine.groups[gIndex].ratings[iIndex].rating = (long)(r*((long)1<<32));
-				mine.groups[gIndex].ratings[iIndex].weight = w;
-
-				if (i%100 == 0) LOG.info(".");
-			}
-	        LOG.info("Completed-------------------");
-
-			LOG.info("Quering Group Ratings-------------------");
-			rs = jdbi.Query("exec usp_DM_group_Ratings_select");
-			LOG.info("Loading Group Ratings-------------------");
-
-			int k = 0;
-			i=-1;
-			gIndex=0;
-			iIndex=0;
-			short[] ratings = new short[7];
-			while  ( rs.next() ) {
-				k++;
-				if (k % 100 == 0)
-					LOG.info(".");
-				gIndex = mine.getGroupIndex( rs.getInt("groupID") );
-				id = rs.getInt("itemID");
-				iIndex = mine.getItemIndex(id);
-				rr = rs.getInt("rating");
-				w = rs.getShort("weight");
-				if (id != i) {
-					if (i>=0) mine.groups[gIndex].ratings[iIndex].ratings = ratings;
-					i = id;
-					ratings = new short[7];
-					for (int count=0;count<7;count++)
-						ratings[count]=0;
-				}
-				ratings[rr] = w;
-			}
-			if (i>=0)
-				mine.groups[gIndex].ratings[iIndex].ratings = ratings;
-			LOG.info("Completed-------------------");
-
-	        readGroupUserMembership();
-
-			for (i=0; i<mine.getGroupCount() ; i++) {
-				mine.groups[i].dx = GroupInfo.DIRTY_DX+1;
-				mine.groups[i].refresh();
-			}
-
-			LOG.info("Completed-------------------");
-			i=1;
-		}
-		catch(SQLException ex){
-			System.err.println("LoadGroupRatings SQLException: " + ex.getMessage());
-		}
-
-		return (i>0);
-	}
-
-
-	public void readGroupUserMembership() {
-		LOG.info("Quering Group User Xref-------------------");
-		ResultSet rs = jdbi.Query("exec usp_DM_user_GroupMembership_select");
-		LOG.info("Loading Group User Xref-------------------");
-		while  ( rs.next() ) {
-			int uIndex = mine.getUserIndex( rs.getInt(1) );
-			int gIndex = mine.getGroupIndex( rs.getInt(2) );
-
-			mine.groups[gIndex].userList[uIndex/8] ^= 1<<uIndex%8;
-			mine.groups[gIndex].memberCount++;
-			if (mine.users[uIndex] != null)
-			{
-				mine.users[uIndex].groupIndex = gIndex;
-				mine.users[uIndex].happiness = rs.getInt(3)/100;
-			}
-		}
-		rs.close();
-	}
-	public boolean loadGroupByUserMembership() {
-		int count = 0;
-		LOG.info("Quering Group User Xref-------------------");
-		ResultSet rs = jdbi.Query("exec usp_DM_user_GroupMembership_select");
-		LOG.info("Loading Group User Xref:");
-		while  ( rs.next() ) {
-			if (count++ % 100==0) LOG.info(".");
-			int uIndex = mine.getUserIndex( rs.getInt(1) );
-			int gIndex = mine.getGroupIndex( rs.getInt(2) );
-			double h = rs.getInt(3)/100;
-
-			if (mine.users[uIndex] != null) {
-				mine.groups[gIndex].addUser(uIndex,mine.users[uIndex].ratings,(float) h);
-				mine.users[uIndex].setGroup(gIndex, (float) h);
-			}
-		}
-		rs.close();
-		return (count>0);
-	}
-
-	public void loadUserRatings(int start, int length) {
+	public void loadUserRatings() {
+//	public void loadUserRatings(int start, int length) {
 		int[] tempItems = new int[mine.getItemCount()];		//init for later use with User Ratings
 		byte[] tempRatings = new byte[mine.getItemCount()];	//init for later use with User Ratings
 
-		LOG.info("Querying User Ratings ("+mine.getUserID(start)+" - "+mine.getUserID(start+length-1)+")--------");
-		ResultSet rs = jdbi.Query("exec usp_DM_user_Rating_Select_Range "+mine.getUserID(start)+", "+mine.getUserID(start+length-1));
+//		LOG.info("Querying User Ratings ("+mine.getUserID(start)+" - "+mine.getUserID(start+length-1)+")--------");
+		List<Tuple3> userRatings = jdbi.withHandle(handle -> handle
+				.createQuery("SELECT * FROM user_rating GROUP BY user_id")
+				.mapTo(Tuple3.class)
+				.list());
+// 		ResultSet rs = jdbi.Query("exec usp_DM_user_Rating_Select_Range "+mine.getUserID(start)+", "+mine.getUserID(start+length-1));
 		LOG.info("Loading User Ratings-------------------");
 		long endTime = System.currentTimeMillis();
 		long totalTime = endTime;
 		int count=0;
-		boolean moreDB=rs.next();
-		byte[] r = new byte[4];
+		boolean hasMore=rs.next();
+		byte[] rating = new byte[4];
 		int newu=-1;
-		while (moreDB) {
+		while (hasMore) {
 			if (count == 0) newu = rs.getInt(1);
 			int i=0;
 			int u = newu;
 			if (count % 100 == 0) System.out.print(".");
-			while (newu==u && moreDB)
+			while (newu==u && hasMore)
 			{
 				int item = mine.getItemIndex( rs.getInt(2) );
-				r = rs.getBytes(3);
-				if (r[0] > (byte) 0)
+				rating = rs.getBytes(3);
+				if (rating[0] > (byte) 0)
 				{
 					tempItems[i] = item;
-					tempRatings[i++] = (byte) (r[0] & 7);
+					tempRatings[i++] = (byte) (rating[0] & 7);
 				}
-				moreDB=rs.next();
-				if (moreDB) newu = rs.getInt(1);
+				hasMore=rs.next();
+				if (hasMore) newu = rs.getInt(1);
 			}
 			int index = mine.getUserIndex( u );
 			mine.users[index] = new UserInfo( index+start, u, tempItems, tempRatings, i);
 //System.out.print(index);
 			count++;
 		}
-		LOG.info("---->loaded "+count);
-
+		int currentUserId;
+		int lastUserId;
+		int item;
+		int rating;
+		for(Tuple3 userRating : userRatings) {
+			currentUserId = (Integer)userRating.first;
+			item = mine.getItemIndex((Integer)userRating.second);
+			rating = (Integer)userRating.third;
+		}
+//		LOG.info("---->loaded "+count);
+		LOG.info("Loaded "+userRatings.size()+" User Ratings.");
 		endTime = System.currentTimeMillis();
 		LOG.info("Total Load Time ="+(endTime-totalTime));
 		rs.close();
 		LOG.info("\nCompleted");
 	}
 
-	public void loadIndividualRatings(int index) {
-		int	i,itemId;
-		int	u;
+	public void loadUserRatingsByUser(int userIndex) {
+		int	i = 0;
+		int itemId;
+		int	userId = 0;
 		int[] tempItems;
 		byte[] tempRatings;
-		byte[] r;
+		byte[] rating;
 		int	count;
 		try {
 			tempItems = new int[mine.getItemCount()];		//init for later use with User Ratings
 			tempRatings = new byte[mine.getItemCount()];	//init for later use with User Ratings
 
-	        itemId = mine.getUserID(index);
+	        itemId = mine.getUserID(userIndex);
 
 //	        System.out.println("Loading User "+id+"'s Ratings-------------------");
 			ResultSet rs = jdbi.Query(con,"exec usp_DM_user_Rating_Select_Indiv "+itemId);
 
-			i=0;u=0;
-			r = new byte[4];
-			while (rs.next())
-			{
-				u = rs.getInt(1);
+			rating = new byte[4];
+			while (rs.next()) {
+				userId = rs.getInt(1);
 				itemId = rs.getInt(2);
 				if (!mine.validItemID(itemId)) {
 					mine.addItem(itemId);
@@ -300,11 +320,11 @@ public class DAO
 						mine.groups[g].addItem(mine.getItemIndex(itemId));
 				}
 				tempItems[i] = mine.getItemIndex( itemId );
-				r = rs.getBytes(3);
-				tempRatings[i++] = (byte) (r[0] & 7);
+				rating = rs.getBytes(3);
+				tempRatings[i++] = (byte) (rating[0] & 7);
 
 			}
-			if (i>0) mine.users[index].setRatings(tempItems, tempRatings, i);
+			if (i>0) mine.users[userIndex].setRatings(tempItems, tempRatings, i);
 			rs.close();
 		}
 		catch(SQLException ex){ System.err.println("LoadIndividualRatings SQLException: " + ex.getMessage());ex.printStackTrace(System.out);}
@@ -407,16 +427,8 @@ public class DAO
 	}
 
 	public void storeGroupRatings() {
-		int	i, index;
-		int	u, newu;
-		int[] tempItems;
-		byte[] tempRatings;
-		int	count,votes;
-		byte b;
-		float avg;
-
+		int	i;
 		LOG.info("Storing Group Ratings...");
-
 		try {
 			FileWriter foutValue = new FileWriter("tbl_Temp_Field_Analysis_Result_Group__Item_XrefValue.txt");
 			FileWriter foutHistogram = new FileWriter("tbl_Temp_Field_Analysis_Result_Group__Item_XrefHistogram.txt");
@@ -427,15 +439,15 @@ public class DAO
 					try {
 						for (int j = 0; j < mine.groups[i].ratingCount; j++)
 							if (mine.groups[i].ratings[j].modified) {
-								if (mine.groups[i].ratings[j].weight >= MIN_RATINGES_PER_PREDICTON) {
-									foutValue.write(mine.groups[i].value_fargID + "|" + mine.getItemID(j) + "|" + (((float) mine.groups[i].ratings[j].rating / ((long) 1 << 32))) + "|" + mine.groups[i].ratings[j].weight + ";");
+								if (mine.groups[i].ratings[j].weight >= MIN_RATINGS_PER_PREDICTON) {
+									foutValue.write(mine.groups[i].valueFargID + "|" + mine.getItemID(j) + "|" + (((float) mine.groups[i].ratings[j].rating / ((long) 1 << 32))) + "|" + mine.groups[i].ratings[j].weight + ";");
 									for (int k = 1; k < 7; k++) {
-										foutHistogram.write(mine.groups[i].hist_fargID + "|" + mine.getItemID(j) + "|" + k + "|" + mine.groups[i].ratings[j].ratings[k] + ";");
+										foutHistogram.write(mine.groups[i].histFargID + "|" + mine.getItemID(j) + "|" + k + "|" + mine.groups[i].ratings[j].ratings[k] + ";");
 									}
-								} else if (mine.groups[i].ratings[j].weight == MIN_RATINGES_PER_PREDICTON - 1) {
-									foutValue.write(mine.groups[i].value_fargID + "|" + mine.getItemID(j) + "|0.0|0;");
+								} else if (mine.groups[i].ratings[j].weight == MIN_RATINGS_PER_PREDICTON - 1) {
+									foutValue.write(mine.groups[i].valueFargID + "|" + mine.getItemID(j) + "|0.0|0;");
 									for (int k = 1; k < 7; k++) {
-										foutHistogram.write(mine.groups[i].hist_fargID + "|" + mine.getItemID(j) + "|" + k + "|0;");
+										foutHistogram.write(mine.groups[i].histFargID + "|" + mine.getItemID(j) + "|" + k + "|0;");
 									}
 								}
 								mine.groups[i].ratings[j].modified = false;
@@ -482,8 +494,8 @@ public class DAO
  				rs = jdbi.Query("Exec usp_DM_Prediction_Group_Insert "+mine.getGroupID(i));
 
 				rs.next();
-				mine.groups[i].value_fargID = rs.getInt(1);
-				mine.groups[i].hist_fargID = rs.getInt(2);
+				mine.groups[i].valueFargID = rs.getInt(1);
+				mine.groups[i].histFargID = rs.getInt(2);
 			}
 //			rs.close();
 //		}

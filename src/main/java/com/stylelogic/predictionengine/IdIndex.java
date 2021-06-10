@@ -21,8 +21,7 @@ class IdIndex {
 		growthFactor = 1 + padding;
 		ids = new int[(int)(idList.size()*growthFactor)];
 
-		for (i=0; i<idList.size(); i++)
-		{
+		for (i=0; i<idList.size(); i++) {
 			ids[i] = idList.get(i);
 			if (ids[i] > maxID) maxID = ids[i]; // Determine max ID in list
 			if (ids[i] < minID) minID = ids[i]; // Determine min ID in list

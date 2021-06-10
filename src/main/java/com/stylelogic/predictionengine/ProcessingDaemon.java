@@ -59,7 +59,7 @@ class ProcessingDaemon extends Thread {
                 System.out.print("Processing user " + id + " (g=" + groupingEngine.mine.users[index].groupIndex + ")");
                 if (groupingEngine.kMean.isolateUser(index))                                //Must Remove User from Old Group first
                 {
-                    groupingEngine.dao.loadIndividualRatings(processingConn, index);                //Load User's new ratings, which have changed
+                    groupingEngine.dao.loadUserRatingsByUser(processingConn, index);                //Load User's new ratings, which have changed
                     System.out.print(" -- ");
                     if (groupingEngine.mine.users[index].ratings.length >= GroupingEngine.MIN_RATING_COUNT) {
                         groupingEngine.kMean.inspectUser(index);                                    //Locate the best group the user with the new ratings
