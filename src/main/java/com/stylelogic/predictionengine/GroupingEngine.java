@@ -155,8 +155,7 @@ public class GroupingEngine implements EngineControls //extends Frame
 		shutDown();
 	}
 
-	public void shutDown()
-	{
+	public void shutDown() {
 		int i=0;
 
 		gui.addMessage("Shutting Down All Daemons");
@@ -190,6 +189,10 @@ public class GroupingEngine implements EngineControls //extends Frame
 
 		gui.dispose();
 		System.out.println("Prediction Engine shutdown.");
+	}
+
+	public void gracefulShutdown() {
+		shutDown();
 	}
 
 	public void refresh() {
